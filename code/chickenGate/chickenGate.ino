@@ -1,5 +1,20 @@
 #include <Wire.h>
+//#include "config.ino"
 
+typedef struct { //used as storage for the eeprom
+  int temperatureLoopTime = 2000;
+  int BPLoopTime = 200;
+  int mainLoopTime = 2000;
+
+  float longitude =43.605604;
+  float latitude = -1.062740;
+
+  float GMTshift = 1.0; // in hours
+  int closeShift = 30; // in minutes
+  int openShift = 0; // in minutes
+
+} configuration;
+configuration *config;
 
 /////////////////////////////////////////
 ///  CAPTEUR TEMPERATURE ET HIMIDITE  ///
@@ -12,10 +27,9 @@ BMx280I2C capteurTempHum_interieur(I2C_ADDRESS_INTERIEUR);
 BMx280I2C capteurTempHum_exterieur(I2C_ADDRESS_EXTERIEUR);
 
 unsigned long timeBoucleTemperature = 0;
-#define TEMPS_BOUCLE_TEMP 2000
 
 //valeur*100
-#define TAILLE_TAB_TEMP_HUM 1000
+#define TAILLE_TAB_TEMP_HUM 10000
 short temperaturesInt[TAILLE_TAB_TEMP_HUM] = {0};
 short humiditeInt[TAILLE_TAB_TEMP_HUM] = {0};
 short temperaturesExt[TAILLE_TAB_TEMP_HUM] = {0};
@@ -63,7 +77,6 @@ bool oldEtatBPAerationFerme = false;
 #include <RTC.h>
 static DS3231 RTC;
 unsigned long timeBoucleHorloge = 0;
-#define TEMPS_BOUCLE_HORLOGE 2000
 byte year, month, day, hour, minute, oldDay = 0;
 
 #define PIN_CAPTEUR_LUM 33
@@ -72,14 +85,9 @@ bool etatCapteurLum = false;
 /////////////////////////////////////
 ///  ephemeride et automtisation  ///
 /////////////////////////////////////
-#include <Dusk2Dawn.h>
-#define LONGITUDE 43.605604
-#define LATITUDE -1.062740
-#define DECALAGE_GMT 1
-Dusk2Dawn ephemeride(LONGITUDE, LATITUDE , DECALAGE_GMT);
+#include "Dusk2Dawn.h"
+Dusk2Dawn ephemeride(config->longitude, config->latitude , config->GMTshift);
 
-#define DECALAGE_FERMETURE 30 //en minutes
-#define DECALAGE_OUVERTURE 0
 int minutesRTC = 0; //temps en minutes depuis minuit
 int minutesOuverture = 0;
 int minutesFermeture = 0;
@@ -90,6 +98,8 @@ enumEtatPorte etatPorte;
 void setup() {
   Serial.begin(115200);
   Serial.println("Debut");
+  
+  InitEEPROM();
 
   /////////////////////////////////////////
   ///  CAPTEUR TEMPERATURE ET HIMIDITE  ///
@@ -162,8 +172,8 @@ void setup() {
   ///  ephemeride et automtisation  ///
   /////////////////////////////////////
   int minutesRTC = hour * 24 + minute; //temps en minutes depuis minuit
-  int minutesOuverture =  ephemeride.sunrise(year, month, day, false) + DECALAGE_OUVERTURE;
-  int minutesFermeture = ephemeride.sunrise(year, month, day, false) + DECALAGE_FERMETURE;
+  int minutesOuverture =  ephemeride.sunrise(year, month, day, false) + config->openShift;
+  int minutesFermeture = ephemeride.sunset(year, month, day, false) + config->closeShift;
   etatPorte = EtatPorteInconnue;
   if (!digitalRead(PIN_ENDSTOP_PORTE_HAUT))
   {
@@ -186,7 +196,7 @@ void loop() {
   if (timeBoucleTemperature < temps)
   {
     Serial.println("Lance mesures");
-    timeBoucleTemperature += TEMPS_BOUCLE_TEMP;
+    timeBoucleTemperature += config->temperatureLoopTime;
     capteurTempHum_interieur.measure();
     capteurTempHum_exterieur.measure();
     nouvelleMesure = true;
@@ -226,7 +236,7 @@ void loop() {
   ///////////////////////////
   if (timeBoucleBP < temps)
   {
-    timeBoucleBP += TEMPS_BOUCLE_BP;
+    timeBoucleBP += config->BPLoopTime;
 
     etatBPPorteMonte = !digitalRead(PIN_BP_PORTE_MONTE);
     if (etatBPPorteMonte != oldEtatBPPorteMonte)
@@ -293,7 +303,7 @@ void loop() {
   ///////////////////////////////////
   if (timeBoucleHorloge < temps)
   {
-    timeBoucleHorloge += TEMPS_BOUCLE_HORLOGE;
+    timeBoucleHorloge += config->mainLoopTime;
     etatCapteurLum = !digitalRead(PIN_CAPTEUR_LUM);
 
     year = RTC.getYear();
@@ -319,8 +329,8 @@ void loop() {
 
     if (day != oldDay)
     {
-      minutesOuverture =  ephemeride.sunrise(year, month, day, false) + DECALAGE_OUVERTURE;
-      minutesFermeture = ephemeride.sunset(year, month, day, false) + DECALAGE_FERMETURE;
+      minutesOuverture =  ephemeride.sunrise(year, month, day, false) + config->openShift;
+      minutesFermeture = ephemeride.sunset(year, month, day, false) + config->closeShift;
     }
 
     minutesRTC = hour * 24 + minute; //temps en minutes depuis minuit
