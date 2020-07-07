@@ -1,18 +1,26 @@
+#ifndef CONFIG_H
+#define config_H
 #include <Preferences.h>
 
-Preferences prefs;
 
+typedef struct { //used as storage for the eeprom
+  int temperatureLoopTime = 2000;
+  int BPLoopTime = 200;
+  int mainLoopTime = 2000;
 
+  float longitude =43.605604;
+  float latitude = -1.062740;
 
+  float GMTshift = 1.0; // in hours
+  int closeShift = 30; // in minutes
+  int openShift = 0; // in minutes
 
-extern configuration *config;
+} configuration;
 
+void InitEEPROM();
+boolean is_initial_program_load();
+void loadEEPROMValues();
+void saveToEEPROM();
+void loadDefaultValues();
 
-void InitEEPROM()
-{
-  prefs.begin("config");
-  size_t schLen = prefs.getBytesLength("config");
-  char buffer[schLen]; // prepare a buffer for the data
-  prefs.getBytes("config", buffer, schLen);
-  config=(configuration *)buffer;
-}
+#endif
