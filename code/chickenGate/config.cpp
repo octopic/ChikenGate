@@ -4,7 +4,7 @@
 configuration *config;
 Preferences prefs;
 
-boolean is_initial_program_load()
+boolean IsInitialProgramLoad()
 {
   const String version_date = __DATE__ __TIME__;
   uint16_t len = version_date.length();
@@ -16,7 +16,6 @@ boolean is_initial_program_load()
   {
     prefs.putString("firstBoot", version_date);
     is_ipl = true;
-
   }
   return is_ipl;
 }
@@ -26,19 +25,19 @@ void InitEEPROM()
   prefs.begin("firstBoot", false);
   prefs.begin("config");
 
-  if (is_initial_program_load())
+  if (IsInitialProgramLoad())
   {
-    loadEEPROMValues();
+    LoadEEPROMValues();
   }
   else
   {
-    loadDefaultValues();
-    saveToEEPROM();
+    LoadDefaultValues();
+    SaveToEEPROM();
 
   }
 }
 
-void loadDefaultValues()
+void LoadDefaultValues()
 {
   config->temperatureLoopTime = 2000;
   config->BPLoopTime = 200;
@@ -50,9 +49,9 @@ void loadDefaultValues()
   config->GMTshift = 1.0; // in hours
   config->closeShift = 30; // in minutes
   config->openShift = 0; // in minutes
-
 }
-void loadEEPROMValues()
+
+void LoadEEPROMValues()
 {
   size_t schLen = prefs.getBytesLength("config");
   char buffer[schLen]; // prepare a buffer for the data
@@ -60,7 +59,7 @@ void loadEEPROMValues()
   config = (configuration *)buffer;
 }
 
-void saveToEEPROM()
+void SaveToEEPROM()
 {
   prefs.putBytes("config", config, sizeof(configuration));
 }

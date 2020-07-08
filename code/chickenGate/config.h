@@ -18,9 +18,9 @@ typedef struct { //used as storage for the eeprom
 } configuration;
 
 void InitEEPROM();
-boolean is_initial_program_load();
-void loadEEPROMValues();
-void saveToEEPROM();
-void loadDefaultValues();
+boolean IsInitialProgramLoad();
+void LoadEEPROMValues();
+void SaveToEEPROM();
+void LoadDefaultValues();
 
 #endif

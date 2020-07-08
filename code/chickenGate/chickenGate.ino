@@ -1,5 +1,6 @@
 #include <Wire.h>
 #include "config.h"
+#include "wifiServer.h"
 
 extern configuration *config;
 /////////////////////////////////////////
@@ -86,6 +87,7 @@ void setup() {
   Serial.println("Debut");
   
   InitEEPROM();
+  InitWIFI();
 
   /////////////////////////////////////////
   ///  CAPTEUR TEMPERATURE ET HIMIDITE  ///
