@@ -1,136 +1,159 @@
 #include "wifiServer.h"
+//https://lastminuteengineers.com/creating-esp32-web-server-arduino-ide/
 
-//https://randomnerdtutorials.com/esp32-web-server-arduino-ide/
 const char* ssid = "ChickenGate";
 const char* password = "PiouPiouPiou";
-WiFiServer server(80);
-String header;
 
-bool clientConnected = false;
+/* Put IP Address details */
+//IPAddress local_ip(192, 168, 1, 1);
+//IPAddress gateway(192, 168, 1, 1);
+//IPAddress subnet(255, 255, 255, 0);
 
-// Current time
-unsigned long currentTime = millis();
-// Previous time
-unsigned long previousTime = 0;
-// Define timeout time in milliseconds (example: 2000ms = 2s)
-const long timeoutTime = 2000;
-WiFiClient client;
-String currentLine;
+WebServer server(80);
 
-void WebPage()
+
+
+String SendHTML()
 {
-  // Display the HTML web page
-  client.println("<!DOCTYPE html><html>");
-  client.println("<head><meta name=\"viewport\" content=\"width=device-width, initial-scale=1\">");
-  client.println("<link rel=\"icon\" href=\"data:,\">");
-  // CSS to style the on/off buttons
-  // Feel free to change the background-color and font-size attributes to fit your preferences
-  client.println("<style>html { font-family: Helvetica; display: inline-block; margin: 0px auto; text-align: center;}");
-  client.println(".button { background-color: #4CAF50; border: none; color: white; padding: 16px 40px;");
-  client.println("text-decoration: none; font-size: 30px; margin: 2px; cursor: pointer;}");
-  client.println(".button2 {background-color: #555555;}</style></head>");
+  String ptr = "<!DOCTYPE html> <html>\n";
+  ptr += "<head><meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0, user-scalable=no\">\n";
+  ptr += "<title>LED Control</title>\n";
+  ptr += "<style>html { font-family: Helvetica; display: inline-block; margin: 0px auto; text-align: center;}\n";
+  ptr += "body{margin-top: 50px;} h1 {color: #444444;margin: 50px auto 30px;} h3 {color: #444444;margin-bottom: 50px;}\n";
+  ptr += ".button {display: block;width: 80px;background-color: #3498db;border: none;color: white;padding: 13px 30px;text-decoration: none;font-size: 25px;margin: 0px auto 35px;cursor: pointer;border-radius: 4px;}\n";
+  ptr += ".button-on {background-color: #3498db;}\n";
+  ptr += ".button-on:active {background-color: #2980b9;}\n";
+  ptr += ".button-off {background-color: #34495e;}\n";
+  ptr += ".button-off:active {background-color: #2c3e50;}\n";
+  ptr += "p {font-size: 14px;color: #888;margin-bottom: 10px;}\n";
+  ptr += "</style>\n";
+  ptr += "</head>\n";
+  ptr += "<body>\n";
+  ptr += "<h1>ESP32 Web Server</h1>\n";
+  ptr += "<h3>Using Access Point(AP) Mode</h3>\n";
 
-  // Web Page Heading
-  client.println("<body><h1>ESP32 Web Server</h1>");
-
-  // Display current state, and ON/OFF buttons for GPIO 26
-  /*client.println("<p>GPIO 26 - State " + output26State + "</p>");
-  // If the output26State is off, it displays the ON button
-  if (output26State == "off") {
-    client.println("<p><a href=\"/26/on\"><button class=\"button\">ON</button></a></p>");
-  } else {
-    client.println("<p><a href=\"/26/off\"><button class=\"button button2\">OFF</button></a></p>");
-  }*/
-
-  // Display current state, and ON/OFF buttons for GPIO 27
-  /*client.println("<p>GPIO 27 - State " + output27State + "</p>");
-  // If the output27State is off, it displays the ON button
-  if (output27State == "off") {
-    client.println("<p><a href=\"/27/on\"><button class=\"button\">ON</button></a></p>");
-  } else {
-    client.println("<p><a href=\"/27/off\"><button class=\"button button2\">OFF</button></a></p>");
-  }*/
-  client.println("</body></html>");
-
-  // The HTTP response ends with another blank line
-  client.println();
+  if (etatMoteur == 1)
+  {
+    ptr += "<p>Porte Status: Monte</p><a class=\"button button-off\" href=\"/porteMonteOff\">Arret</a>\n";
+    ptr += "<p>Porte Status: Monte</p><a class=\"button button-on\" href=\"/porteDescendOn\">Descend</a>\n";
+  }
+  else if (etatMoteur == 2)
+  {
+    ptr += "<p>Porte Status: Descend</p><a class=\"button button-on\" href=\"/porteMonteOn\">Monte</a>\n";
+    ptr += "<p>Porte Status: Descend</p><a class=\"button button-off\" href=\"/porteDescendOff\">Arret</a>\n";
+  }
+  else
+  {
+    ptr += "<p>Porte Status: Arret</p><a class=\"button button-on\" href=\"/porteMonteOn\">Monte</a>\n";
+    ptr += "<p>Porte Status: Arret</p><a class=\"button button-on\" href=\"/porteDescendOn\">Descend</a>\n";
+  }
+  
+  if (etatAeration == 1)
+  {
+    ptr += "<p>Aeration Status: Ouvre</p><a class=\"button button-off\" href=\"/aerationOuvreOff\">Arret</a>\n";
+    ptr += "<p>Aeration Status: Ouvre</p><a class=\"button button-on\" href=\"/aerationFermeOn\">Ferme</a>\n";
+  }
+  else if (etatAeration == 2)
+  {
+    ptr += "<p>Aeration Status: Ferme</p><a class=\"button button-on\" href=\"/aerationOuvreOn\">Ouvre</a>\n";
+    ptr += "<p>Aeration Status: Ferme</p><a class=\"button button-off\" href=\"/aerationFermeOff\">Arret</a>\n";
+  }
+  else
+  {
+    ptr += "<p>Aeration Status: Arret</p><a class=\"button button-on\" href=\"/aerationOuvreOn\">Ouvre</a>\n";
+    ptr += "<p>Aeration Status: Arret</p><a class=\"button button-on\" href=\"/aerationFermeOn\">Ferme</a>\n";
+  }
+  return ptr;
 }
+
+void handle_OnConnect()
+{
+  server.send(200, "text/html", SendHTML());
+}
+
+void handle_porteMonteOn()
+{
+  MontePorte();
+  server.send(200, "text/html", SendHTML());
+}
+
+void handle_porteMonteOff()
+{
+  StopMoteurPorte();
+  server.send(200, "text/html", SendHTML());
+}
+
+void handle_porteDescendOn()
+{
+  DescendPorte();
+  server.send(200, "text/html", SendHTML());
+}
+
+void handle_porteDescendOff()
+{
+  StopMoteurPorte();
+  server.send(200, "text/html", SendHTML());
+}
+
+void handle_aerationOuvreOn()
+{
+  OuvreAeration();
+  server.send(200, "text/html", SendHTML());
+}
+
+void handle_aerationOuvreOff()
+{
+  StopMoteurAeration();
+  server.send(200, "text/html", SendHTML());
+}
+
+void handle_aerationFermeOn()
+{
+  FemrmeAeration();
+  server.send(200, "text/html", SendHTML());
+}
+
+void handle_aerationFermeOff()
+{
+  StopMoteurAeration();
+  server.send(200, "text/html", SendHTML());
+}
+
+void handle_NotFound() 
+{
+  server.send(404, "text/plain", "Not found");
+}
+
+
 
 void InitWIFI()
 {
-  Serial.print("Connecting to ");
+  Serial.print("setting server ");
   Serial.println(ssid);
-  WiFi.begin(ssid, password);
-  while (WiFi.status() != WL_CONNECTED) {
-    delay(500);
-    Serial.print(".");
-  }
-  // Print local IP address and start web server
-  Serial.println("");
-  Serial.println("WiFi connected.");
-  Serial.println("IP address: ");
-  Serial.println(WiFi.localIP());
+  //WiFi.begin(ssid, password);
+  WiFi.softAP(ssid, password);
+  IPAddress IP = WiFi.softAPIP();
+  //WiFi.softAPConfig(local_ip, gateway, subnet);
+
+  Serial.print("AP IP address: ");
+  Serial.println(IP);
+delay(100);
+  server.on("/", handle_OnConnect);
+  server.on("/porteMonteOn", handle_porteMonteOn);
+  server.on("/porteDescendOn", handle_porteDescendOn);
+  server.on("/aerationOuvreOn", handle_aerationOuvreOn);
+  server.on("/aerationFermeOn", handle_aerationFermeOn);
+  server.on("/porteMonteOff", handle_porteMonteOff);
+  server.on("/porteDescendOff", handle_porteDescendOff);
+  server.on("/aerationOuvreOff", handle_aerationOuvreOff);
+  server.on("/aerationFermeOff", handle_aerationFermeOff);
+  server.onNotFound(handle_NotFound);
+
   server.begin();
+  Serial.println("HTTP server started");
 }
 
 void ServerLoop()
 {
-  if (!clientConnected )
-  {
-    client = server.available();
-    if (client) {
-      clientConnected = true; // If a new client connects,
-      currentTime = millis();
-      previousTime = currentTime;
-      Serial.println("New Client.");          // print a message out in the serial port
-      currentLine = "";                // make a String to hold incoming data from the client
-    }
-  }
-  if (client.connected())
-  {
-    if (clientConnected && currentTime - previousTime <= timeoutTime)
-    { // loop while the client's connected
-      currentTime = millis();
-      if (client.available())
-      {
-        char c = client.read();             // read a byte, then
-        Serial.write(c);                    // print it out the serial monitor
-        header += c;
-        if (c == '\n')
-        { // if the byte is a newline character
-          // if the current line is blank, you got two newline characters in a row.
-          // that's the end of the client HTTP request, so send a response:
-          if (currentLine.length() == 0)
-          {
-            // HTTP headers always start with a response code (e.g. HTTP/1.1 200 OK)
-            // and a content-type so the client knows what's coming, then a blank line:
-            client.println("HTTP/1.1 200 OK");
-            client.println("Content-type:text/html");
-            client.println("Connection: close");
-            client.println();
-
-            WebPage();
-          } 
-          else
-          { // if you got a newline, then clear currentLine
-            currentLine = "";
-          }
-        }
-        else if (c != '\r')
-        { // if you got anything else but a carriage return character,
-          currentLine += c;      // add it to the end of the currentLine
-        }
-      }
-    }
-  }
-  else
-  {
-    // Clear the header variable
-    header = "";
-    // Close the connection
-    client.stop();
-    Serial.println("Client disconnected.");
-    Serial.println("");
-    clientConnected = false;
-  }
+  server.handleClient();
 }

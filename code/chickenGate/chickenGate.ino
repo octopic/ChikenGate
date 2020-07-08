@@ -2,7 +2,7 @@
 #include "config.h"
 #include "wifiServer.h"
 
-extern configuration *config;
+extern configuration config;
 /////////////////////////////////////////
 ///  CAPTEUR TEMPERATURE ET HIMIDITE  ///
 /////////////////////////////////////////
@@ -58,6 +58,9 @@ bool oldEtatBPPorteDescend = false;
 bool oldEtatBPAerationOuvre = false;
 bool oldEtatBPAerationFerme = false;
 
+byte etatEndstopPorte = 0;
+byte etatEndstopAeration = 0;
+
 /////////////////////////////////////
 ///  RTC & Capteur de luminosite  ///
 /////////////////////////////////////
@@ -73,7 +76,7 @@ bool etatCapteurLum = false;
 ///  ephemeride et automtisation  ///
 /////////////////////////////////////
 #include "Dusk2Dawn.h"
-Dusk2Dawn ephemeride(config->longitude, config->latitude , config->GMTshift);
+Dusk2Dawn ephemeride(config.longitude, config.latitude , config.GMTshift);
 
 int minutesRTC = 0; //temps en minutes depuis minuit
 int minutesOuverture = 0;
@@ -82,10 +85,11 @@ enum enumEtatPorte {EnBas, EnMontee, EnHaut, EnDescente, EtatPorteInconnue};
 enumEtatPorte etatPorte;
 
 
-void setup() {
+void setup() 
+{
   Serial.begin(115200);
   Serial.println("Debut");
-  
+
   InitEEPROM();
   InitWIFI();
 
@@ -160,16 +164,20 @@ void setup() {
   ///  ephemeride et automtisation  ///
   /////////////////////////////////////
   int minutesRTC = hour * 24 + minute; //temps en minutes depuis minuit
-  int minutesOuverture =  ephemeride.sunrise(year, month, day, false) + config->openShift;
-  int minutesFermeture = ephemeride.sunset(year, month, day, false) + config->closeShift;
+  int minutesOuverture =  ephemeride.sunrise(year, month, day, false) + config.openShift;
+  int minutesFermeture = ephemeride.sunset(year, month, day, false) + config.closeShift;
   etatPorte = EtatPorteInconnue;
+  etatEndstopPorte = 0;
   if (!digitalRead(PIN_ENDSTOP_PORTE_HAUT))
   {
     etatPorte = EnHaut;
+    etatEndstopPorte = 1;
   }
   if (!digitalRead(PIN_ENDSTOP_PORTE_BAS))
   {
     etatPorte = EnBas;
+    etatEndstopPorte = 2;
+
   }
 }
 
@@ -177,14 +185,14 @@ void setup() {
 void loop() {
   // put your main code here, to run repeatedly:
   unsigned long temps = millis();
-
+ServerLoop();
   ////////////////////////////////////////
   ///  CAPTEUR TEMPERATURE ET HIMIDITE ///
   ////////////////////////////////////////
   if (timeBoucleTemperature < temps)
   {
     Serial.println("Lance mesures");
-    timeBoucleTemperature += config->temperatureLoopTime;
+    timeBoucleTemperature += config.temperatureLoopTime;
     capteurTempHum_interieur.measure();
     capteurTempHum_exterieur.measure();
     nouvelleMesure = true;
@@ -224,7 +232,7 @@ void loop() {
   ///////////////////////////
   if (timeBoucleBP < temps)
   {
-    timeBoucleBP += config->BPLoopTime;
+    timeBoucleBP += config.BPLoopTime;
 
     etatBPPorteMonte = !digitalRead(PIN_BP_PORTE_MONTE);
     if (etatBPPorteMonte != oldEtatBPPorteMonte)
@@ -257,23 +265,22 @@ void loop() {
         FemrmeAeration();
       oldEtatBPAerationFerme = etatBPAerationFerme;
     }
-    Serial.print("BP Mont Desc Ouv Fer SWH SWB SWO SWF MotPort MotAer");
-    Serial.print(etatBPPorteMonte);
-    Serial.print(etatBPPorteDescend);
-    Serial.print(etatBPAerationOuvre);
-    Serial.print(etatBPAerationFerme)  ;
-    Serial.print(digitalRead(PIN_ENDSTOP_PORTE_HAUT));
-    Serial.print(digitalRead(PIN_ENDSTOP_PORTE_BAS));
-    Serial.print(digitalRead(PIN_ENDSTOP_AERATION_OUVERT));
-    Serial.print(digitalRead(PIN_ENDSTOP_AERATION_FERME));
-    Serial.print(etatMoteur);
-    Serial.println(etatAeration);
+    etatEndstopPorte = 0;
+    if (!digitalRead(PIN_ENDSTOP_PORTE_HAUT))
+      etatEndstopPorte += 1;
+    if (!digitalRead(PIN_ENDSTOP_PORTE_BAS))
+      etatEndstopPorte += 2;
 
+    etatEndstopAeration = 0;
+    if (!digitalRead(PIN_ENDSTOP_AERATION_OUVERT))
+      etatEndstopAeration += 1;
+    if (!digitalRead(PIN_ENDSTOP_AERATION_FERME))
+      etatEndstopAeration += 2;
   }
 
   if (etatMoteur)
   {
-    if ((!digitalRead(PIN_ENDSTOP_PORTE_HAUT) && etatMoteur == 1) || (!digitalRead(PIN_ENDSTOP_PORTE_BAS) && etatMoteur == 2))
+    if ((etatEndstopPorte == 1 && etatMoteur == 1) || (etatEndstopPorte == 2 && etatMoteur == 2))
     {
       StopMoteurPorte();
     }
@@ -281,17 +288,18 @@ void loop() {
 
   if (etatAeration)
   {
-    if ((!digitalRead(PIN_ENDSTOP_AERATION_OUVERT) && etatAeration == 1) || (!digitalRead(PIN_ENDSTOP_AERATION_FERME) && etatAeration == 2))
+    if ((etatEndstopAeration == 1 && etatAeration == 1) || (etatEndstopAeration == 2 && etatAeration == 2))
     {
       StopMoteurAeration();
     }
   }
+
   ///////////////////////////////////
   ///  RTC & Capteur de luminosite///
   ///////////////////////////////////
   if (timeBoucleHorloge < temps)
   {
-    timeBoucleHorloge += config->mainLoopTime;
+    timeBoucleHorloge += config.mainLoopTime;
     etatCapteurLum = !digitalRead(PIN_CAPTEUR_LUM);
 
     year = RTC.getYear();
@@ -317,8 +325,8 @@ void loop() {
 
     if (day != oldDay)
     {
-      minutesOuverture =  ephemeride.sunrise(year, month, day, false) + config->openShift;
-      minutesFermeture = ephemeride.sunset(year, month, day, false) + config->closeShift;
+      minutesOuverture = ephemeride.sunrise(year, month, day, false) + config.openShift;
+      minutesFermeture = ephemeride.sunset(year, month, day, false) + config.closeShift;
     }
 
     minutesRTC = hour * 24 + minute; //temps en minutes depuis minuit
@@ -327,8 +335,6 @@ void loop() {
       MontePorte();
     if (minutesRTC >= minutesFermeture && (etatPorte == EnHaut || etatPorte == EtatPorteInconnue))
       DescendPorte();
-    
-
   }
 }
 
@@ -338,18 +344,16 @@ void StopMoteurPorte()
   digitalWrite(PIN_MOTEUR_PORTE_MONTE, 1);
   etatPorte = EtatPorteInconnue;
 
-
-  if (!digitalRead(PIN_ENDSTOP_PORTE_HAUT))
+  if (etatEndstopPorte == 1)
     etatPorte = EnHaut;
 
-  if (!digitalRead(PIN_ENDSTOP_PORTE_BAS))
+  if (etatEndstopPorte == 2)
     etatPorte = EnBas;
-
 }
 
 void MontePorte()
 {
-  if (digitalRead(PIN_ENDSTOP_PORTE_HAUT))
+  if ((etatEndstopPorte & 1) == 0)
   {
     Serial.println("monte porte");
     digitalWrite(PIN_MOTEUR_PORTE_DESCEND, 1);
@@ -366,7 +370,7 @@ void MontePorte()
 
 void DescendPorte()
 {
-  if (digitalRead(PIN_ENDSTOP_PORTE_BAS))
+  if ((etatEndstopPorte & 2) == 0)
   {
     digitalWrite(PIN_MOTEUR_PORTE_MONTE, 1);
     delay(100);
@@ -378,7 +382,6 @@ void DescendPorte()
   {
     StopMoteurPorte();
   }
-
 }
 
 void StopMoteurAeration()
@@ -390,7 +393,7 @@ void StopMoteurAeration()
 
 void OuvreAeration()
 {
-  if (digitalRead(PIN_ENDSTOP_AERATION_OUVERT))
+  if ((etatEndstopAeration & 1) == 0)
   {
     digitalWrite(PIN_MOTEUR_AERATION_FERME, 1);
     delay(100);
@@ -405,7 +408,7 @@ void OuvreAeration()
 
 void FemrmeAeration()
 {
-  if (digitalRead(PIN_ENDSTOP_AERATION_FERME))
+  if ((etatEndstopAeration & 2) == 0)
   {
     digitalWrite(PIN_MOTEUR_AERATION_OUVRE, 1);
     delay(100);

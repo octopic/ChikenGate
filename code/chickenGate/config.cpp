@@ -1,7 +1,7 @@
 #include "config.h"
 
 
-configuration *config;
+configuration config;
 Preferences prefs;
 
 boolean IsInitialProgramLoad()
@@ -39,27 +39,29 @@ void InitEEPROM()
 
 void LoadDefaultValues()
 {
-  config->temperatureLoopTime = 2000;
-  config->BPLoopTime = 200;
-  config->mainLoopTime = 2000;
+  config.temperatureLoopTime = 2000;
+  config.BPLoopTime = 200;
+  config.mainLoopTime = 2000;
 
-  config->longitude = 43.605604;
-  config->latitude = -1.062740;
+  config.longitude = 43.605604;
+  config.latitude = -1.062740;
 
-  config->GMTshift = 1.0; // in hours
-  config->closeShift = 30; // in minutes
-  config->openShift = 0; // in minutes
+  config.GMTshift = 1.0; // in hours
+  config.closeShift = 30; // in minutes
+  config.openShift = 0; // in minutes
 }
 
 void LoadEEPROMValues()
 {
   size_t schLen = prefs.getBytesLength("config");
-  char buffer[schLen]; // prepare a buffer for the data
+  //char buffer[schLen]; // prepare a buffer for the data
+  char *buffer = (char *)&config;
   prefs.getBytes("config", buffer, schLen);
-  config = (configuration *)buffer;
+
+ // config = (configuration )buffer;
 }
 
 void SaveToEEPROM()
 {
-  prefs.putBytes("config", config, sizeof(configuration));
+  prefs.putBytes("config", &config, sizeof(configuration));
 }
