@@ -11,7 +11,7 @@ typedef struct { //used as storage for the eeprom
   float longitude =43.605604;
   float latitude = -1.062740;
 
-  float GMTshift = 1.0; // in hours
+  float GMTshift = 0.0; // in hours
   int closeShift = 30; // in minutes
   int openShift = 0; // in minutes
 

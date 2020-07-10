@@ -5,16 +5,18 @@
 #include <WiFi.h>
 #include <WebServer.h>
 
+
+
 extern short temperaturesInt[];
 extern short humiditeInt[];
 extern short temperaturesExt[];
 extern short humiditeExt[];
 extern int posTabTempHum;
-extern byte year;
-extern byte month;
-extern byte day;
-extern byte hour;
-extern byte minute;
+extern int year;
+extern int month;
+extern int day;
+extern int hour;
+extern int minute;
 extern bool etatCapteurLum;
 extern int minutesOuverture;
 extern int minutesFermeture;

@@ -67,7 +67,7 @@ byte etatEndstopAeration = 0;
 #include <RTC.h>
 static DS3231 RTC;
 unsigned long timeBoucleHorloge = 0;
-byte year, month, day, hour, minute, oldDay = 0;
+int year, month, day, hour, minute, seconds, oldDay = 0;
 
 #define PIN_CAPTEUR_LUM 33
 bool etatCapteurLum = false;
@@ -85,7 +85,7 @@ enum enumEtatPorte {EnBas, EnMontee, EnHaut, EnDescente, EtatPorteInconnue};
 enumEtatPorte etatPorte;
 
 
-void setup() 
+void setup()
 {
   Serial.begin(115200);
   Serial.println("Debut");
@@ -122,11 +122,11 @@ void setup()
   /////////////
   Serial.println("intit RTC");
   RTC.begin();
-  if (!RTC.isRunning())
-  {
+  /*if (!RTC.isRunning())
+    {
     RTC.setHourMode(CLOCK_H24);
     RTC.setDateTime(__DATE__, __TIME__);
-  }
+    }*/
   year = RTC.getYear();
   month = RTC.getMonth();
   day = RTC.getDay();
@@ -158,7 +158,7 @@ void setup()
   pinMode(PIN_BP_AERATION_FERME, INPUT_PULLUP);
   StopMoteurPorte();
   StopMoteurAeration();
-  Serial.println("fin init");
+
 
   /////////////////////////////////////
   ///  ephemeride et automtisation  ///
@@ -179,19 +179,21 @@ void setup()
     etatEndstopPorte = 2;
 
   }
+
+  Serial.println("fin init");
 }
 
 
 void loop() {
   // put your main code here, to run repeatedly:
   unsigned long temps = millis();
-ServerLoop();
+  ServerLoop();
   ////////////////////////////////////////
   ///  CAPTEUR TEMPERATURE ET HIMIDITE ///
   ////////////////////////////////////////
   if (timeBoucleTemperature < temps)
   {
-    Serial.println("Lance mesures");
+    //Serial.println("Lance mesures");
     timeBoucleTemperature += config.temperatureLoopTime;
     capteurTempHum_interieur.measure();
     capteurTempHum_exterieur.measure();
@@ -200,9 +202,14 @@ ServerLoop();
 
   if (nouvelleMesure && capteurTempHum_interieur.hasValue() && capteurTempHum_exterieur.hasValue())
   {
-    Serial.println("Lit mesures");
+    //Serial.println("Lit mesures");
     nouvelleMesure = false;
     float tmp;
+
+    posTabTempHum++;
+    if (posTabTempHum > TAILLE_TAB_TEMP_HUM)
+      posTabTempHum = 0;
+
     tmp = capteurTempHum_interieur.getTemperature() * 100.0;
     temperaturesInt[posTabTempHum] = tmp;
     tmp = capteurTempHum_interieur.getHumidity() * 100.0;
@@ -213,18 +220,20 @@ ServerLoop();
     humiditeExt[posTabTempHum] = tmp;
 
     Serial.print("ext : Temp  ");
-    Serial.print(temperaturesExt[posTabTempHum]);
+    Serial.print((float)(temperaturesExt[posTabTempHum]) / 100.0);
     Serial.print(" hum ");
-    Serial.print(humiditeExt[posTabTempHum]);
-    Serial.print("int : Temp ");
-    Serial.print(temperaturesInt[posTabTempHum]);
+    Serial.print((float)(humiditeExt[posTabTempHum]) / 100.0);
+    Serial.print(" int : Temp ");
+    Serial.print((float)(temperaturesInt[posTabTempHum]) / 100.0);
     Serial.print(" hum ");
-    Serial.println(humiditeInt[posTabTempHum]);
+    Serial.print((float)(humiditeInt[posTabTempHum]) / 100.0);
+    if(etatCapteurLum)
+    Serial.println(" Jour");
+    else
+    Serial.println(" Nuit");
 
 
-    posTabTempHum++;
-    if (posTabTempHum > TAILLE_TAB_TEMP_HUM)
-      posTabTempHum = 0;
+
   }
 
   ///////////////////////////
@@ -307,21 +316,22 @@ ServerLoop();
     day = RTC.getDay();
     hour = RTC.getHours();
     minute = RTC.getMinutes();
+    seconds = RTC.getSeconds();
 
     Serial.print(" ");
-    Serial.print(RTC.getDay());
+    Serial.print(day);
     Serial.print("-");
-    Serial.print(RTC.getMonth());
+    Serial.print(month);
     Serial.print("-");
-    Serial.print(RTC.getYear());
+    Serial.print(year);
 
     Serial.print(" ");
 
-    Serial.print(RTC.getHours());
+    Serial.print(hour);
     Serial.print(":");
-    Serial.print(RTC.getMinutes());
+    Serial.print(minute);
     Serial.print(":");
-    Serial.println(RTC.getSeconds());
+    Serial.println(seconds);
 
     if (day != oldDay)
     {
@@ -340,6 +350,7 @@ ServerLoop();
 
 void StopMoteurPorte()
 {
+  Serial.println("stop porte");
   digitalWrite(PIN_MOTEUR_PORTE_DESCEND, 1);
   digitalWrite(PIN_MOTEUR_PORTE_MONTE, 1);
   etatPorte = EtatPorteInconnue;
@@ -372,6 +383,7 @@ void DescendPorte()
 {
   if ((etatEndstopPorte & 2) == 0)
   {
+    Serial.println("descend porte");
     digitalWrite(PIN_MOTEUR_PORTE_MONTE, 1);
     delay(100);
     digitalWrite(PIN_MOTEUR_PORTE_DESCEND, 0);
@@ -386,6 +398,7 @@ void DescendPorte()
 
 void StopMoteurAeration()
 {
+  Serial.println("stop aeration");
   digitalWrite(PIN_MOTEUR_AERATION_FERME, 1);
   digitalWrite(PIN_MOTEUR_AERATION_OUVRE, 1);
   etatAeration = 0;
@@ -393,6 +406,7 @@ void StopMoteurAeration()
 
 void OuvreAeration()
 {
+  Serial.println("ouvre aeration");
   if ((etatEndstopAeration & 1) == 0)
   {
     digitalWrite(PIN_MOTEUR_AERATION_FERME, 1);
@@ -408,6 +422,7 @@ void OuvreAeration()
 
 void FemrmeAeration()
 {
+   Serial.println("ferme aeration");
   if ((etatEndstopAeration & 2) == 0)
   {
     digitalWrite(PIN_MOTEUR_AERATION_OUVRE, 1);
